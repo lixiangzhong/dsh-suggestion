@@ -67,6 +67,16 @@ export function apply(ctx, rawConfig) {
 
   const service = createSuggestionService({ ctx, config, warn });
   ctx.effect(() => registerSuggestionRoute(ctx, service), 'dsh-suggestion: suggest route');
+  // 用户不在该会话窗口时客户端不会来请求；这一条负责在轮次结束后补一份到缓存，
+  // 切回来时直接命中，不用再等模型。
+  ctx.effect(
+    () => ctx.on('session/event', (session, event) => {
+      if (event?.type !== 'turn/end') return;
+      if (event.data?.reason?.kind === 'aborted') return;
+      service.scheduleBackground(session?.id);
+    }),
+    'dsh-suggestion: turn-end fallback',
+  );
   ctx.effect(() => () => service.dispose(), 'dsh-suggestion: dispose');
   // 留痕开启时先落一行启动记录：用来区分「配置没生效」和「客户端没触发」。
   service.trace?.({

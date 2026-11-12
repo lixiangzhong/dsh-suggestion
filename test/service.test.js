@@ -15,8 +15,8 @@ import { createSuggestionService } from '../lib/service.js';
  * @param {object} data - 数据。
  * @returns {object} 事件。
  */
-function event(seq, type, data) {
-  return { seq, type, data };
+function event(seq, type, data, time = Date.now()) {
+  return { seq, type, data, time };
 }
 
 /**
@@ -187,6 +187,70 @@ test('the summary never blocks the suggestion and is refreshed afterwards', asyn
   const second = await service.suggest({ sessionId: 'session-1', locale: 'zh' });
   assert.equal(second, '补上缺失的断言');
   assert.match(calls[2].messages[0].content[0].text, /滚动摘要/);
+});
+
+test('background fallback generates without a client request and the cache serves the return', async () => {
+  const { llm, calls } = fakeLlm(['提交这四个文件']);
+  const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });
+  const service = createSuggestionService({
+    ctx,
+    config: normalizeConfig({}),
+    warn: WARN,
+    backgroundDelayMs: 0,
+  });
+
+  service.scheduleBackground('session-1');
+  await new Promise(resolve => { setTimeout(resolve, 20); });
+  assert.equal(calls.length, 1, 'the host generated once on its own');
+
+  // 切回窗口：客户端来要同一轮，必须直接命中缓存，不再调用模型。
+  const text = await service.suggest({ sessionId: 'session-1', locale: 'en' });
+  assert.equal(text, '提交这四个文件');
+  assert.equal(calls.length, 1, 'the client request reused the background result');
+});
+
+test('cancelBackground stops a pending fallback generation', async () => {
+  const { llm, calls } = fakeLlm(['不该出现']);
+  const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });
+  const service = createSuggestionService({
+    ctx,
+    config: normalizeConfig({}),
+    warn: WARN,
+    backgroundDelayMs: 30,
+  });
+
+  service.scheduleBackground('session-1');
+  assert.equal(service.cancelBackground('session-1'), true);
+  assert.equal(service.cancelBackground('session-1'), false, 'the second cancel has nothing to clear');
+  await new Promise(resolve => { setTimeout(resolve, 60); });
+  assert.equal(calls.length, 0, 'a cancelled fallback must not call the model');
+});
+
+test('cache is keyed by locale so a language switch does not serve the wrong text', async () => {
+  const { llm, calls } = fakeLlm(['推进这轮改动', 'continue with this change']);
+  const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });
+  const service = createSuggestionService({ ctx, config: normalizeConfig({}), warn: WARN });
+
+  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'zh' }), '推进这轮改动');
+  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'en' }), 'continue with this change');
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].system, /Write in English/);
+});
+
+test('a cached turn is served even after the fresh-turn window passed', async () => {
+  const events = baseEvents();
+  const { llm, calls } = fakeLlm(['跑一遍回归']);
+  const ctx = fakeCtx(events, llm, { route: { provider: 'p', model: 'm' } });
+  const service = createSuggestionService({ ctx, config: normalizeConfig({}), warn: WARN });
+
+  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'zh' }), '跑一遍回归');
+  assert.equal(calls.length, 1);
+
+  // 把这一轮挪到一小时前：没有缓存时会被判 stale，但缓存命中应当优先。
+  const last = events[events.length - 1];
+  last.time = Date.now() - 60 * 60 * 1_000;
+  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'zh' }), '跑一遍回归');
+  assert.equal(calls.length, 1, 'the cached suggestion must win over the staleness rule');
 });
 
 test('an empty model answer degrades to null instead of an empty placeholder', async () => {

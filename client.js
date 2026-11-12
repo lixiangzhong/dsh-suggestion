@@ -25,6 +25,8 @@ window.__ModuleLoader__.load({
     const SUGGEST_PATH = '/dsh-suggestion/suggest';
     /** 前端留痕接口；Host 只在配置了 tracePath 时才真正落盘。 */
     const TRACE_PATH = '/dsh-suggestion/trace';
+    /** 「这一轮不用兜底」的取消接口：用户在场但输入框有草稿时调用。 */
+    const SKIP_PATH = '/dsh-suggestion/skip';
     /** 诊断前缀；插件不向宿主抛异常，只打日志。 */
     const LOG_PREFIX = '[dsh-suggestion]';
     /** 客户端构建标记，写进留痕便于确认某个窗口跑的是哪一版。 */
@@ -96,6 +98,29 @@ window.__ModuleLoader__.load({
         }).catch(() => {});
       } catch {
         // 留痕失败不影响功能。
+      }
+    }
+
+    /**
+     * 告诉 Host「这一轮别兜底」。
+     *
+     * 用户就在该会话窗口，但输入框里已有草稿：客户端不会请求建议，
+     * 若不通知，Host 会在 2 秒后白跑一次模型。发送失败无所谓（最坏多花一次调用）。
+     * @param {string} sessionId - 会话 id。
+     * @returns {void}
+     */
+    function skipBackground(sessionId) {
+      if (typeof fetch !== 'function') return;
+      try {
+        void fetch(SKIP_PATH, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ session: sessionId }),
+          cache: 'no-store',
+          keepalive: true,
+        }).catch(() => {});
+      } catch {
+        // 忽略：兜底逻辑本身会自行去重。
       }
     }
 
@@ -563,7 +588,17 @@ window.__ModuleLoader__.load({
           phase: input?.phase ?? 'plain',
           queued: input?.queue?.length ?? 0,
         });
-        if (!canShowRef.current) return;
+        if (!canShowRef.current) {
+          // 人在窗口里但草稿非空：这一轮不请求，也别让 Host 白跑。
+          reportTrace('turn.skipped', {
+            sessionId,
+            draftEmpty,
+            phase: input?.phase ?? 'plain',
+            queued: input?.queue?.length ?? 0,
+          });
+          skipBackground(sessionId);
+          return;
+        }
         void requestSuggestion(sessionId, ctxRef.current);
       }, [running, sessionId]);
 
