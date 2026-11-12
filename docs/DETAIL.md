@@ -21,7 +21,7 @@
 
 ```yaml
 - id: dsh-suggestion
-  name: '@lixiangzhong/dsh-suggestion-bundle'
+  name: '@lixiangzhong/dsh-suggestion'
   config:
     enabled: true
     provider: ''          # 留空 = 跟随该会话最近一次请求的模型

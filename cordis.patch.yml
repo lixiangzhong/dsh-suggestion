@@ -4,4 +4,4 @@
 # 浏览器半边由 package.json 的 dsh.client 声明，Loader 会单独加载 ./client。
 - insert:
     - id: dsh-suggestion
-      name: "@lixiangzhong/dsh-suggestion-bundle"
+      name: "@lixiangzhong/dsh-suggestion"

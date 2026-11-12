@@ -1,9 +1,9 @@
-# 在版本 tag 上发布 @lixiangzhong/dsh-suggestion-bundle 到 npm。
+# 在版本 tag 上发布 @lixiangzhong/dsh-suggestion 到 npm。
 #
 # 认证走 npm Trusted Publishing（OIDC），仓库里不存任何 NPM_TOKEN。
 # 注意：npm 不支持给「尚不存在的包」预配置 Trusted Publisher，所以**首个版本必须先本地发布一次**
 # （`npm login` 后 `npm publish --access public`），包在 registry 上存在之后，再去
-# npmjs.com → Packages → @lixiangzhong/dsh-suggestion-bundle → Settings → Trusted publishing 配置：
+# npmjs.com → Packages → @lixiangzhong/dsh-suggestion → Settings → Trusted publishing 配置：
 #   Provider:        GitHub Actions
 #   User:            lixiangzhong
 #   Repository:      dsh-suggestion

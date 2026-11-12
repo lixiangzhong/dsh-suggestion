@@ -15,7 +15,7 @@ DSH 插件：每轮任务结束后，用模型生成一句「下一步建议」�
 从 npm 安装：
 
 ```text
-plugin_manager install_bundle target=@lixiangzhong/dsh-suggestion-bundle
+plugin_manager install_bundle target=@lixiangzhong/dsh-suggestion
 ```
 
 本地开发（以符号链接方式装进 profile）：
@@ -24,7 +24,7 @@ plugin_manager install_bundle target=@lixiangzhong/dsh-suggestion-bundle
 plugin_manager install_bundle target=link:/path/to/dsh-suggestion
 ```
 
-安装后在 Plugins 页启用 `输入框建议`（bundle 名 `@lixiangzhong/dsh-suggestion-bundle`，插件行 id `dsh-suggestion`）。配置见 [docs/DETAIL.md](docs/DETAIL.md)。
+安装后在 Plugins 页启用 `输入框建议`（bundle 名 `@lixiangzhong/dsh-suggestion`，插件行 id `dsh-suggestion`）。配置见 [docs/DETAIL.md](docs/DETAIL.md)。
 
 ## 结构
 

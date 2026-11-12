@@ -1,5 +1,5 @@
 /**
- * 浏览器半边：@lixiangzhong/dsh-suggestion-bundle。
+ * 浏览器半边：@lixiangzhong/dsh-suggestion。
  *
  * 做三件事：
  *  1. 在 `conversation.composer.dock` 挂一个不可见条目，用标准 Session props 观察
@@ -14,7 +14,7 @@
  * 可点击的建议条，功能不中断、也不会因为选择器失配而报错。
  */
 window.__ModuleLoader__.load({
-  id: '@lixiangzhong/dsh-suggestion-bundle',
+  id: '@lixiangzhong/dsh-suggestion',
   factory(require) {
     'use strict';
 

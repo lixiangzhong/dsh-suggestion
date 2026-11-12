@@ -1,5 +1,5 @@
 /**
- * Host 半边：@lixiangzhong/dsh-suggestion-bundle。
+ * Host 半边：@lixiangzhong/dsh-suggestion。
  *
  * 会话每一轮结束后，浏览器半边会带着会话 id 与界面语言请求本插件，
  * 这里读取该会话的最后一轮上下文（必要时补充早期对话摘要），用模型生成
