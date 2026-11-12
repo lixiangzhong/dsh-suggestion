@@ -56,4 +56,13 @@ jobs:
         run: npm test
 
       - name: Publish with provenance
-        run: npm publish
+        run: |
+          name="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          # 首发必须本地直发（npm 不允许给不存在的包预配置 Trusted Publisher），
+          # 所以首个 tag 指向的版本可能已经在 registry 上；这里做成幂等，不把 CI 弄红。
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::notice::${name}@${version} already exists on the registry; skipping publish"
+            exit 0
+          fi
+          npm publish
