@@ -1,0 +1,59 @@
+# 在版本 tag 上发布 @lixiangzhong/dsh-suggestion-bundle 到 npm。
+#
+# 认证走 npm Trusted Publishing（OIDC），仓库里不存任何 NPM_TOKEN。
+# 注意：npm 不支持给「尚不存在的包」预配置 Trusted Publisher，所以**首个版本必须先本地发布一次**
+# （`npm login` 后 `npm publish --access public`），包在 registry 上存在之后，再去
+# npmjs.com → Packages → @lixiangzhong/dsh-suggestion-bundle → Settings → Trusted publishing 配置：
+#   Provider:        GitHub Actions
+#   User:            lixiangzhong
+#   Repository:      dsh-suggestion
+#   Workflow:        publish.yml
+#   Allowed actions: 勾选允许 npm publish（新配置默认只有 stage-only）
+#
+# 发版流程：改 package.json 版本号 → 提交 → 推送 → 推 `v<version>` tag
+# （例如 `git tag v0.1.1 && git push origin v0.1.1`）。tag job 会校验 tag 与 package.json 一致、
+# 跑测试，然后带 provenance 发布。
+name: Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Trusted Publishing 需要 OIDC token
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # Trusted Publishing 需要 npm >= 11.5.1；runner 自带的 npm 可能偏旧。
+      - name: Ensure a Trusted-Publishing-capable npm
+        run: npm install --global npm@latest
+
+      - name: Check the tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          version="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${version}"
+            exit 1
+          fi
+          echo "releasing ${version}"
+
+      - name: Run package checks
+        run: npm test
+
+      - name: Publish with provenance
+        run: npm publish
