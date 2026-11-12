@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Composer suggestion",
+    "description": "Writes a model-generated next-step suggestion into the composer placeholder after each turn; press Tab to fill it into the draft."
+  }
+}

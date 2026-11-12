@@ -1,0 +1,59 @@
+{
+  "name": "@lixiangzhong/dsh-suggestion-bundle",
+  "version": "0.1.0",
+  "description": "Writes a model-generated next-step suggestion into the DSH composer placeholder after each turn; Tab fills it into the draft.",
+  "author": "lixiangzhong",
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "lib",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "check": "node --check index.js && node --check client.js",
+    "test": "node --check index.js && node --check client.js && node --test"
+  },
+  "engines": {
+    "node": ">=20",
+    "dsh": ">=0.2.2-rc.2"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "dsh-bundle",
+    "deepseek-harness",
+    "composer",
+    "placeholder",
+    "suggestion"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-conversation"
+      ]
+    },
+    "manifestVersion": 1
+  }
+}

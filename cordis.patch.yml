@@ -1,0 +1,7 @@
+# 把本 bundle 挂进 DSH Web profile。
+# package.json 的 dsh.bundle.patch 只负责「这个 bundle 由哪些行组成」，
+# 下面这一行才是真正在 Host 插件树里实例化插件的入口。
+# 浏览器半边由 package.json 的 dsh.client 声明，Loader 会单独加载 ./client。
+- insert:
+    - id: dsh-suggestion
+      name: "@lixiangzhong/dsh-suggestion-bundle"
