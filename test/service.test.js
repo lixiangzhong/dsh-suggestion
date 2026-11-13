@@ -226,15 +226,18 @@ test('cancelBackground stops a pending fallback generation', async () => {
   assert.equal(calls.length, 0, 'a cancelled fallback must not call the model');
 });
 
-test('cache is keyed by locale so a language switch does not serve the wrong text', async () => {
-  const { llm, calls } = fakeLlm(['推进这轮改动', 'continue with this change']);
+test('the cache is shared across locales so a fallback and a client request never diverge', async () => {
+  // 背景：兜底生成时可能还没拿到客户端语言（默认 en），客户端随后带着 zh 来要。
+  // 同一轮若按语言分区，就会出现「已经生成却被浪费、再调一次还失败」的情况，
+  // 这里固定成「一轮一份」，语言只影响生成时的提示词。
+  const { llm, calls } = fakeLlm(['推进这轮改动']);
   const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });
   const service = createSuggestionService({ ctx, config: normalizeConfig({}), warn: WARN });
 
+  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'en' }), '推进这轮改动');
   assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'zh' }), '推进这轮改动');
-  assert.equal(await service.suggest({ sessionId: 'session-1', locale: 'en' }), 'continue with this change');
-  assert.equal(calls.length, 2);
-  assert.match(calls[1].system, /Write in English/);
+  assert.equal(calls.length, 1, 'a different locale must not trigger a second call');
+  assert.match(calls[0].system, /Write in English/);
 });
 
 test('a cached turn is served even after the fresh-turn window passed', async () => {

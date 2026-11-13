@@ -7,9 +7,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { Readable } from 'node:stream';
+
 import { normalizeConfig } from '../lib/config.js';
 import { createSuggestionService } from '../lib/service.js';
-import { registerSuggestionRoute, SUGGEST_PATH } from '../lib/route.js';
+import { LOCALE_PATH, registerSuggestionRoute, SUGGEST_PATH } from '../lib/route.js';
 
 /**
  * 造一条会话事件。
@@ -135,4 +137,27 @@ test('a suggestion longer than 100 characters reaches the client intact', async 
   assert.equal(payload.text, longText, 'the JSON body must carry the whole suggestion');
   assert.ok(!payload.text.endsWith('…'), 'no ellipsis is appended below the cap');
   assert.ok(Array.from(payload.text).length > 100);
+});
+
+test('the client can report its UI locale for background generation', async () => {
+  const seen = [];
+  const service = { suggest: async () => null, noteLocale: locale => seen.push(locale) };
+  const ctx = {
+    sessions: { get: () => undefined },
+    llm: fakeLlm(''),
+    connection: { requestRejection: () => undefined },
+  };
+  const handler = mountRoute(ctx, service);
+
+  // 用真实 Readable：路由的 readBody 依赖 IncomingMessage 的 .on 与异步迭代。
+  const request = Readable.from([Buffer.from(JSON.stringify({ locale: 'zh-CN' }))]);
+  request.method = 'POST';
+  request.url = LOCALE_PATH;
+  request.headers = { host: '127.0.0.1:1' };
+  const { response, done } = fakeResponse();
+  handler(request, response);
+
+  await done;
+  assert.equal(response.status, 204);
+  assert.deepEqual(seen, ['zh-CN']);
 });

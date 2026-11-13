@@ -27,6 +27,8 @@ window.__ModuleLoader__.load({
     const TRACE_PATH = '/dsh-suggestion/trace';
     /** 「这一轮不用兜底」的取消接口：用户在场但输入框有草稿时调用。 */
     const SKIP_PATH = '/dsh-suggestion/skip';
+    /** 界面语言上报接口：Host 的兜底生成要用它决定建议语言。 */
+    const LOCALE_PATH = '/dsh-suggestion/locale';
     /** 诊断前缀；插件不向宿主抛异常，只打日志。 */
     const LOG_PREFIX = '[dsh-suggestion]';
     /** 客户端构建标记，写进留痕便于确认某个窗口跑的是哪一版。 */
@@ -121,6 +123,29 @@ window.__ModuleLoader__.load({
         }).catch(() => {});
       } catch {
         // 忽略：兜底逻辑本身会自行去重。
+      }
+    }
+
+    /**
+     * 把当前界面语言报给 Host。
+     *
+     * 用户不在会话窗口时由 Host 兜底生成，它自己读不到界面语言；这里在插件挂载、
+     * 以及用户切换语言时上报一次，兜底就不会用错语言。
+     * @param {object} ctx - Client context。
+     * @returns {void}
+     */
+    function reportLocale(ctx) {
+      if (typeof fetch !== 'function') return;
+      try {
+        void fetch(LOCALE_PATH, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ locale: activeLocale(ctx) }),
+          cache: 'no-store',
+          keepalive: true,
+        }).catch(() => {});
+      } catch {
+        // 上报失败只会让兜底退回默认语言，不影响主流程。
       }
     }
 
@@ -657,6 +682,7 @@ window.__ModuleLoader__.load({
       apply(ctx) {
         ctxRef.current = ctx;
         reportTrace('client.start', { locale: activeLocale(ctx), build: CLIENT_BUILD });
+        reportLocale(ctx);
         try {
           ctx.effect(() => {
             const disposers = [
@@ -673,6 +699,11 @@ window.__ModuleLoader__.load({
               }
             };
           }, 'dsh-suggestion: locales');
+
+          // 用户切换界面语言后同步一次，兜底才会跟着换语言。
+          ctx.effect(() => ctx.locale.subscribe(() => {
+            reportLocale(ctx);
+          }), 'dsh-suggestion: locale sync');
 
           const controller = createPlaceholderController(ctx);
           ctx.effect(() => controller.start(), 'dsh-suggestion: placeholder');
