@@ -61,6 +61,11 @@ npm test      # node --check + 纯函数单测
 
 无构建步骤：`client.js` 直接以 `window.__ModuleLoader__` 工厂形式加载。
 
+改完代码生效方式不同，容易踩坑，详见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)：
+
+- **Host 半**（`index.js`、`lib/*`、配置、路由）：必须**重启 DSH**；`plugin_manager` 返回 `applied` 只代表配置树更新，不代表模块换了新代码。
+- **客户端半**（`client.js`）：内容变化会换 rev，刷新窗口即加载新版本。
+
 ## License
 
 MIT

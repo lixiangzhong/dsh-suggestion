@@ -47,7 +47,7 @@
 
 兜底生成需要知道界面语言：客户端挂载与切换语言时会 POST 一次 `/dsh-suggestion/locale`，Host 记住最近一次上报；从未上报时退回 `en`。
 
-验证完把 `tracePath` 清空即可，写盘随之停止。浏览器控制台还挂了一个只读写插件自身状态的调试入口 `__DSH_SUGGESTION__`（`get` / `set` / `request` / `repaint`）。
+验证完把 `tracePath` 清空即可，写盘随之停止。更多「改了没生效 / 没看到建议」的排查步骤见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。浏览器控制台还挂了一个只读写插件自身状态的调试入口 `__DSH_SUGGESTION__`（`get` / `set` / `request` / `repaint`）。
 
 ## 成本与边界
 
