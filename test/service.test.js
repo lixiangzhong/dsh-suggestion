@@ -253,6 +253,19 @@ test('a cached turn is served even after the fresh-turn window passed', async ()
   assert.equal(calls.length, 1, 'the cached suggestion must win over the staleness rule');
 });
 
+test('a long suggestion keeps its full text for Tab, only the placeholder truncates visually', async () => {
+  const longText = `跑一遍全部回归并修掉失败项：${'检查登录与鉴权'.repeat(15)}`;
+  assert.ok(Array.from(longText).length > 100, 'fixture must exceed the old 100-char cap');
+  assert.ok(Array.from(longText).length <= 200, 'fixture stays within the default cap');
+  const { llm } = fakeLlm([longText]);
+  const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });
+  const service = createSuggestionService({ ctx, config: normalizeConfig({}), warn: WARN });
+
+  const text = await service.suggest({ sessionId: 'session-1', locale: 'zh' });
+  assert.equal(text, longText, 'the full text must reach the client so Tab can insert it');
+  assert.ok(!text.endsWith('…'), 'no ellipsis is appended below the cap');
+});
+
 test('an empty model answer degrades to null instead of an empty placeholder', async () => {
   const { llm } = fakeLlm(['NONE']);
   const ctx = fakeCtx(baseEvents(), llm, { route: { provider: 'p', model: 'm' } });

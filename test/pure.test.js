@@ -33,7 +33,7 @@ test('normalizeConfig falls back to defaults for junk input', () => {
   });
   assert.equal(parsed.enabled, false);
   assert.equal(parsed.timeoutMs, 1_000);
-  assert.equal(parsed.maxChars, 200);
+  assert.equal(parsed.maxChars, 400);
   assert.equal(parsed.provider, 'deepseek');
   assert.equal(parsed.model, '');
 });
