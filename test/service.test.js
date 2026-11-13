@@ -203,8 +203,8 @@ test('background fallback generates without a client request and the cache serve
   await new Promise(resolve => { setTimeout(resolve, 20); });
   assert.equal(calls.length, 1, 'the host generated once on its own');
 
-  // 切回窗口：客户端来要同一轮，必须直接命中缓存，不再调用模型。
-  const text = await service.suggest({ sessionId: 'session-1', locale: 'en' });
+  // 切回窗口：客户端可能带着**不同**的语言来要同一轮，也必须直接命中缓存。
+  const text = await service.suggest({ sessionId: 'session-1', locale: 'zh' });
   assert.equal(text, '提交这四个文件');
   assert.equal(calls.length, 1, 'the client request reused the background result');
 });
