@@ -1,7 +1,7 @@
 {
   "name": "@lixiangzhong/dsh-suggestion",
-  "version": "0.2.3",
-  "description": "Writes a model-generated next-step suggestion into the DSH composer placeholder after each turn; Tab fills it into the draft.",
+  "version": "0.2.4",
+  "description": "Writes a model-generated next-step suggestion into the DSH composer placeholder after each turn; Tab (desktop) or tap (touch devices) fills it into the draft.",
   "author": "lixiangzhong",
   "repository": {
     "type": "git",
