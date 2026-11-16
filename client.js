@@ -12,6 +12,9 @@
  *
  * 降级：宿主若不再提供 placeholder 节点（版本变化），同一 dock 条目改为渲染一行
  * 可点击的建议条，功能不中断、也不会因为选择器失配而报错。
+ *
+ * 触控：手机/平板没有 Tab 键，占位文字里的建议点不到；这类设备从一开始就走可点
+ * 建议条，并且不接管占位文字，避免同一句建议出现两次。
  */
 window.__ModuleLoader__.load({
   id: '@lixiangzhong/dsh-suggestion',
@@ -32,7 +35,7 @@ window.__ModuleLoader__.load({
     /** 诊断前缀；插件不向宿主抛异常，只打日志。 */
     const LOG_PREFIX = '[dsh-suggestion]';
     /** 客户端构建标记，写进留痕便于确认某个窗口跑的是哪一版。 */
-    const CLIENT_BUILD = '2026-11-12T14:40Z';
+    const CLIENT_BUILD = '2026-11-16T16:55Z';
     /** 单次请求超时：超过就当作没有建议，保持宿主默认占位。 */
     const REQUEST_TIMEOUT_MS = 20_000;
     /** 同一会话两次请求的最小间隔，挡掉重复挂载带来的抖动。 */
@@ -50,20 +53,43 @@ window.__ModuleLoader__.load({
     /** 宿主「默认占位文案」所在的命名空间与键。 */
     const HOST_LOCALE_NS = 'conversation';
     const HOST_DEFAULT_KEYS = ['placeholder.default', 'placeholder.hero'];
+    /**
+     * 触控形态判定：主指针是粗指针、且没有 hover 能力。
+     * 按「主指针」而不是 `any-pointer` 判断，带触屏但以鼠标为主的笔记本仍走桌面形态。
+     */
+    const TOUCH_QUERY = '(hover: none) and (pointer: coarse)';
 
     /** 本插件字典：只放降级建议条需要的界面文案。 */
     const DICTS = {
       zh: {
         'dock.accept': '采纳',
         'dock.hint': 'Tab 填入',
+        'dock.touchHint': '点按采纳',
       },
       en: {
         'dock.accept': 'Use',
         'dock.hint': 'Tab to fill',
+        'dock.touchHint': 'Tap to use',
       },
     };
 
     // ---- 模块级状态：跨 slot 重挂载保留，按会话 id 分桶 ----
+
+    /**
+     * 判断当前是否为触控形态。只在模块加载时判定一次：手机/平板不会在使用中
+     * 切换指针类型；iPad 外接触控板时媒体查询会变成 fine，刷新即恢复桌面形态。
+     * @returns {boolean} 触控形态返回 true。
+     */
+    function detectTouchMode() {
+      try {
+        return typeof matchMedia === 'function' && matchMedia(TOUCH_QUERY).matches === true;
+      } catch {
+        return false;
+      }
+    }
+
+    /** 触控形态下不接管占位文字，改用可点建议条。 */
+    const touchMode = detectTouchMode();
 
     /** sessionId → { text, at }：当前可展示的建议。 */
     const suggestions = new Map();
@@ -374,7 +400,8 @@ window.__ModuleLoader__.load({
         // 被清掉（React 的清理 effect 在绘制之后）。看宿主的 data-phase 直接让位，
         // 避免旧建议闪一下。
         const phase = node.closest?.(`[${CARD_ATTR}]`)?.querySelector?.('[data-phase]')?.getAttribute('data-phase');
-        const shouldShow = sessionId !== undefined
+        const shouldShow = !touchMode
+          && sessionId !== undefined
           && visible.get(sessionId) === true
           && (phase === null || phase === undefined || phase === 'plain');
         if (text === null || !shouldShow) {
@@ -555,7 +582,7 @@ window.__ModuleLoader__.load({
         () => suggestionOf(sessionId),
         () => null,
       );
-      const [fallbackMode, setFallbackMode] = useState(hostHook === false);
+      const [fallbackMode, setFallbackMode] = useState(touchMode || hostHook === false);
 
       const draftEmpty = (input?.draft ?? '') === '';
       const phasePlain = (input?.phase ?? 'plain') === 'plain';
@@ -654,6 +681,11 @@ window.__ModuleLoader__.load({
       }, [sessionId, running]);
 
       useEffect(() => {
+        // 触控设备始终用建议条：占位文字点不到，没必要再去探测宿主钩子。
+        if (touchMode) {
+          setFallbackMode(true);
+          return undefined;
+        }
         if (hostHook !== undefined) {
           setFallbackMode(hostHook === false);
           return undefined;
@@ -668,7 +700,7 @@ window.__ModuleLoader__.load({
       return React.createElement(SuggestionDock, {
         text,
         label: translate(ctxRef.current, 'dock.accept'),
-        hint: translate(ctxRef.current, 'dock.hint'),
+        hint: translate(ctxRef.current, touchMode ? 'dock.touchHint' : 'dock.hint'),
         onAccept: () => {
           const accept = acceptors.get(sessionId);
           if (accept !== undefined) accept(text);
@@ -681,7 +713,7 @@ window.__ModuleLoader__.load({
       inject: ['slots', 'locale'],
       apply(ctx) {
         ctxRef.current = ctx;
-        reportTrace('client.start', { locale: activeLocale(ctx), build: CLIENT_BUILD });
+        reportTrace('client.start', { locale: activeLocale(ctx), build: CLIENT_BUILD, touch: touchMode });
         reportLocale(ctx);
         try {
           ctx.effect(() => {
