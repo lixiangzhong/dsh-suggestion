@@ -14,7 +14,9 @@
  * 可点击的建议条，功能不中断、也不会因为选择器失配而报错。
  *
  * 触控：手机/平板没有 Tab 键，占位文字里的建议点不到；这类设备从一开始就走可点
- * 建议条，并且不接管占位文字，避免同一句建议出现两次。
+ * 建议条，并且不接管占位文字，避免同一句建议出现两次。建议条挂在
+ * `conversation.input.dock`（输入卡片上方的整行条目）而不是 `composer.dock`：
+ * 后者是横向共享行，宿主自己的 activity / usage 也占位，建议会被挤成几个字。
  */
 window.__ModuleLoader__.load({
   id: '@lixiangzhong/dsh-suggestion',
@@ -35,7 +37,7 @@ window.__ModuleLoader__.load({
     /** 诊断前缀；插件不向宿主抛异常，只打日志。 */
     const LOG_PREFIX = '[dsh-suggestion]';
     /** 客户端构建标记，写进留痕便于确认某个窗口跑的是哪一版。 */
-    const CLIENT_BUILD = '2026-11-16T16:55Z';
+    const CLIENT_BUILD = '2026-11-17T00:10Z';
     /** 单次请求超时：超过就当作没有建议，保持宿主默认占位。 */
     const REQUEST_TIMEOUT_MS = 20_000;
     /** 同一会话两次请求的最小间隔，挡掉重复挂载带来的抖动。 */
@@ -58,6 +60,8 @@ window.__ModuleLoader__.load({
      * 按「主指针」而不是 `any-pointer` 判断，带触屏但以鼠标为主的笔记本仍走桌面形态。
      */
     const TOUCH_QUERY = '(hover: none) and (pointer: coarse)';
+    /** 触控建议条最多显示的行数；超出部分省略，采纳后可在草稿里读到全文。 */
+    const TOUCH_MAX_LINES = 3;
 
     /** 本插件字典：只放降级建议条需要的界面文案。 */
     const DICTS = {
@@ -566,6 +570,73 @@ window.__ModuleLoader__.load({
     }
 
     /**
+     * 触控建议条：输入卡片上方的整行条目，最多三行折行，点一下填入草稿。
+     *
+     * 手机没有 Tab 键，而 `composer.dock` 是横向共享行（宿主自己的 activity / usage
+     * 也在里面），建议放那里会被挤成几个字；`input.dock` 才是宿主预留的全宽行。
+     * @param {object} props - slot props（session 作用域标准 props）。
+     * @returns {object | null} React 元素或 null。
+     */
+    function SuggestionTouchRow(props) {
+      const sessionId = props.sessionId;
+      const inputActions = props.inputActions;
+      const useInput = props.useInput;
+      const input = typeof useInput === 'function' ? useInput(state => state) : undefined;
+      const text = useSyncExternalStore(
+        subscribe,
+        () => suggestionOf(sessionId),
+        () => null,
+      );
+      const canShow = (input?.draft ?? '') === ''
+        && (input?.phase ?? 'plain') === 'plain'
+        && (input?.queue?.length ?? 0) === 0;
+      if (!touchMode || text === null || !canShow) return null;
+      const rowStyle = {
+        display: 'block',
+        width: '100%',
+        boxSizing: 'border-box',
+        margin: '0 0 6px',
+        padding: '10px 12px',
+        background: 'var(--dsw-alias-bg-layer-1)',
+        border: '1px solid var(--dsw-alias-border-l1)',
+        borderRadius: '10px',
+        color: 'var(--dsw-alias-label-primary)',
+        fontFamily: 'inherit',
+        fontSize: '13px',
+        lineHeight: '1.45',
+        textAlign: 'left',
+        cursor: 'pointer',
+        WebkitTapHighlightColor: 'transparent',
+      };
+      const textStyle = {
+        display: '-webkit-box',
+        WebkitBoxOrient: 'vertical',
+        WebkitLineClamp: String(TOUCH_MAX_LINES),
+        overflow: 'hidden',
+      };
+      const hintStyle = {
+        display: 'block',
+        marginTop: '6px',
+        color: 'var(--dsw-alias-label-secondary)',
+        fontSize: '11px',
+      };
+      return React.createElement(
+        'button',
+        {
+          type: 'button',
+          style: rowStyle,
+          title: text,
+          onClick: () => {
+            const accept = acceptors.get(sessionId);
+            if (accept !== undefined) accept(text);
+          },
+        },
+        React.createElement('span', { style: textStyle }, text),
+        React.createElement('span', { style: hintStyle }, translate(ctxRef.current, 'dock.touchHint')),
+      );
+    }
+
+    /**
      * 看不见的桥接组件：观察会话状态、注册接受器、必要时渲染降级建议条。
      * @param {object} props - slot props（session 作用域标准 props）。
      * @returns {object | null} React 元素或 null。
@@ -582,7 +653,7 @@ window.__ModuleLoader__.load({
         () => suggestionOf(sessionId),
         () => null,
       );
-      const [fallbackMode, setFallbackMode] = useState(touchMode || hostHook === false);
+      const [fallbackMode, setFallbackMode] = useState(hostHook === false);
 
       const draftEmpty = (input?.draft ?? '') === '';
       const phasePlain = (input?.phase ?? 'plain') === 'plain';
@@ -681,11 +752,6 @@ window.__ModuleLoader__.load({
       }, [sessionId, running]);
 
       useEffect(() => {
-        // 触控设备始终用建议条：占位文字点不到，没必要再去探测宿主钩子。
-        if (touchMode) {
-          setFallbackMode(true);
-          return undefined;
-        }
         if (hostHook !== undefined) {
           setFallbackMode(hostHook === false);
           return undefined;
@@ -700,7 +766,7 @@ window.__ModuleLoader__.load({
       return React.createElement(SuggestionDock, {
         text,
         label: translate(ctxRef.current, 'dock.accept'),
-        hint: translate(ctxRef.current, touchMode ? 'dock.touchHint' : 'dock.hint'),
+        hint: translate(ctxRef.current, 'dock.hint'),
         onAccept: () => {
           const accept = acceptors.get(sessionId);
           if (accept !== undefined) accept(text);
@@ -744,6 +810,11 @@ window.__ModuleLoader__.load({
           ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register(
             { name: 'conversation.composer.dock', id: 'dsh-suggestion', order: 90 },
             SuggestionBridge,
+          ));
+          // 触控形态的整行建议条；桌面形态下组件自己返回 null，不占位。
+          ctx.slots.inject('conversation.input.dock', () => ctx.slots.register(
+            { name: 'conversation.input.dock', id: 'dsh-suggestion-touch', order: 90 },
+            SuggestionTouchRow,
           ));
 
           // 诊断入口：只在插件自己的状态上读写，方便在浏览器控制台核对「请求 → 占位 →
